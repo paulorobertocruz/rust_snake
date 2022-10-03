@@ -23,7 +23,7 @@ impl Plugin for SnakePlugin {
     }
 }
 
-enum SnakeDiraction {
+enum SnakeDirection {
     UP,
     DOWN,
     LEFT,
@@ -32,7 +32,7 @@ enum SnakeDiraction {
 
 #[derive(Component)]
 struct Snake {
-    dir: SnakeDiraction,
+    dir: SnakeDirection,
     body: Vec<Entity>,
 }
 
@@ -44,7 +44,7 @@ fn spawn_snake_head(mut commands: Commands) {
 
     commands.spawn().insert(Snake {
         body: Vec::from([id_head]),
-        dir: SnakeDiraction::RIGHT,
+        dir: SnakeDirection::RIGHT,
     });
 }
 
@@ -84,16 +84,16 @@ fn move_snake_head(snake: &Snake, query_snake_body: &mut Query<(&mut Transform, 
     let (mut snake_body_transform, _) = query_snake_body.get_mut(snake.body[0]).expect("msg");
 
     match snake.dir {
-        SnakeDiraction::UP => {
+        SnakeDirection::UP => {
             snake_body_transform.translation.y += SIZE;
         }
-        SnakeDiraction::DOWN => {
+        SnakeDirection::DOWN => {
             snake_body_transform.translation.y -= SIZE;
         }
-        SnakeDiraction::LEFT => {
+        SnakeDirection::LEFT => {
             snake_body_transform.translation.x -= SIZE;
         }
-        SnakeDiraction::RIGHT => {
+        SnakeDirection::RIGHT => {
             snake_body_transform.translation.x += SIZE;
         }
     }
@@ -116,13 +116,13 @@ fn snake_input(mut query_snake: Query<&mut Snake>, keyboard: Res<Input<KeyCode>>
     match snake_result {
         Ok(mut snake) => {
             if keyboard.pressed(KeyCode::Left) {
-                snake.dir = SnakeDiraction::LEFT;
+                snake.dir = SnakeDirection::LEFT;
             } else if keyboard.pressed(KeyCode::Right) {
-                snake.dir = SnakeDiraction::RIGHT;
+                snake.dir = SnakeDirection::RIGHT;
             } else if keyboard.pressed(KeyCode::Up) {
-                snake.dir = SnakeDiraction::UP;
+                snake.dir = SnakeDirection::UP;
             } else if keyboard.pressed(KeyCode::Down) {
-                snake.dir = SnakeDiraction::DOWN;
+                snake.dir = SnakeDirection::DOWN;
             }
         }
         Err(_) => todo!(),
