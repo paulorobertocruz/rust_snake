@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     consts::*,
     frog::{spawn_frog, Frog},
@@ -33,7 +35,7 @@ enum SnakeDirection {
 #[derive(Component)]
 struct Snake {
     dir: SnakeDirection,
-    body: Vec<Entity>,
+    body: VecDeque<Entity>,
 }
 
 #[derive(Component)]
@@ -43,7 +45,7 @@ fn spawn_snake_head(mut commands: Commands) {
     let id_head = snake_body_node(&mut commands);
 
     commands.spawn().insert(Snake {
-        body: Vec::from([id_head]),
+        body: VecDeque::from([id_head]),
         dir: SnakeDirection::RIGHT,
     });
 }
@@ -57,8 +59,8 @@ fn snake_move(
     if snake_timer.timer.tick(time.delta()).just_finished() {
         let mut snake = query_snake.single_mut();
 
-        let &first_node = snake.body.first().unwrap();
-        let &last_node = snake.body.last().unwrap();
+        let &first_node = snake.body.front().unwrap();
+        let &last_node = snake.body.back().unwrap();
 
         if first_node == last_node {
             let mut first_transform = query_snake_body.get_mut(first_node).unwrap();
@@ -73,9 +75,8 @@ fn snake_move(
                 get_next_head_translation(first_transform.translation, &snake.dir);
             last_transform.translation = head_translation;
 
-            let mut proxy = Vec::from([last_node]);
-            snake.body.iter().skip(1).for_each(|&entity| {proxy.push(entity)});
-            snake.body = proxy;
+            let last = snake.body.pop_back().unwrap();
+            snake.body.push_front(last);
         }
     }
 }
@@ -163,7 +164,7 @@ fn collide_snake_body(
                 commands.entity(entity).despawn();
             }
 
-            snake.body = Vec::from([snake.body[0]]);
+            snake.body = VecDeque::from([snake.body[0]]);
         }
     }
 }
