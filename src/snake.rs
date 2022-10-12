@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     consts::*,
     frog::{spawn_frog, Frog},
@@ -23,7 +25,7 @@ impl Plugin for SnakePlugin {
     }
 }
 
-enum SnakeDiraction {
+enum SnakeDirection {
     UP,
     DOWN,
     LEFT,
@@ -32,82 +34,89 @@ enum SnakeDiraction {
 
 #[derive(Component)]
 struct Snake {
-    dir: SnakeDiraction,
-    body: Vec<Entity>,
+    dir: SnakeDirection,
+    body: VecDeque<Entity>,
 }
 
 #[derive(Component)]
 struct SnakeBodyNode;
 
 fn spawn_snake_head(mut commands: Commands) {
-    let id_head = snake_body_node(&mut commands);
+    let id_head = snake_body_node(
+        &mut commands,
+        Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+    );
 
     commands.spawn().insert(Snake {
-        body: Vec::from([id_head]),
-        dir: SnakeDiraction::RIGHT,
+        body: VecDeque::from([id_head]),
+        dir: SnakeDirection::RIGHT,
     });
 }
 
 fn snake_move(
     time: Res<Time>,
-    query_snake: Query<&Snake>,
+    mut query_snake: Query<&mut Snake>,
     mut snake_timer: ResMut<SnakeTimer>,
-    mut query_snake_body: Query<(&mut Transform, &SnakeBodyNode)>,
+    mut query_snake_body: Query<&mut Transform, With<SnakeBodyNode>>,
 ) {
     if snake_timer.timer.tick(time.delta()).just_finished() {
-        let snake_result = query_snake.get_single();
-        if let Ok(snake) = snake_result {
-            move_snake_tail(snake, &mut query_snake_body);
-            move_snake_head(snake, &mut query_snake_body);
+        let mut snake = query_snake.single_mut();
+
+        let &first_node = snake.body.front().unwrap();
+        let &last_node = snake.body.back().unwrap();
+
+        if first_node == last_node {
+            let mut first_transform = query_snake_body.get_mut(first_node).unwrap();
+            let head_translation =
+                get_next_head_translation(first_transform.translation, &snake.dir);
+            first_transform.translation = head_translation;
+        } else {
+            let [first_transform, mut last_transform] =
+                query_snake_body.many_mut([first_node, last_node]);
+
+            let head_translation =
+                get_next_head_translation(first_transform.translation, &snake.dir);
+            last_transform.translation = head_translation;
+
+            let last = snake.body.pop_back().unwrap();
+            snake.body.push_front(last);
         }
     }
 }
 
-fn move_snake_tail(snake: &Snake, query_snake_body: &mut Query<(&mut Transform, &SnakeBodyNode)>) {
-    let len = snake.body.len();
-    if len <= 1 {
-        return;
-    }
-
-    for index in (1..len).rev() {
-        let current = snake.body[index];
-        let prev = snake.body[index - 1];
-
-        let [(mut current_transform, _), (prev_transform, _)] =
-            query_snake_body.get_many_mut([current, prev]).expect("msg");
-
-        current_transform.translation = prev_transform.translation;
-    }
-}
-
-fn move_snake_head(snake: &Snake, query_snake_body: &mut Query<(&mut Transform, &SnakeBodyNode)>) {
-    let (mut snake_body_transform, _) = query_snake_body.get_mut(snake.body[0]).expect("msg");
-
-    match snake.dir {
-        SnakeDiraction::UP => {
-            snake_body_transform.translation.y += SIZE;
+fn get_next_head_translation(current: Vec3, dir: &SnakeDirection) -> Vec3 {
+    let mut new_position = Vec3 { ..current };
+    match dir {
+        SnakeDirection::UP => {
+            new_position.y += SIZE;
         }
-        SnakeDiraction::DOWN => {
-            snake_body_transform.translation.y -= SIZE;
+        SnakeDirection::DOWN => {
+            new_position.y -= SIZE;
         }
-        SnakeDiraction::LEFT => {
-            snake_body_transform.translation.x -= SIZE;
+        SnakeDirection::LEFT => {
+            new_position.x -= SIZE;
         }
-        SnakeDiraction::RIGHT => {
-            snake_body_transform.translation.x += SIZE;
+        SnakeDirection::RIGHT => {
+            new_position.x += SIZE;
         }
     }
-    if snake_body_transform.translation.x > WINDOW_SIZE_HALF {
-        snake_body_transform.translation.x = -WINDOW_SIZE_HALF;
-    } else if snake_body_transform.translation.x < -WINDOW_SIZE_HALF {
-        snake_body_transform.translation.x = WINDOW_SIZE_HALF;
+    if new_position.x > WINDOW_SIZE_HALF {
+        new_position.x = -WINDOW_SIZE_HALF;
+    } else if new_position.x < -WINDOW_SIZE_HALF {
+        new_position.x = WINDOW_SIZE_HALF;
     }
 
-    if snake_body_transform.translation.y > WINDOW_SIZE_HALF {
-        snake_body_transform.translation.y = -WINDOW_SIZE_HALF;
-    } else if snake_body_transform.translation.y < -WINDOW_SIZE_HALF {
-        snake_body_transform.translation.y = WINDOW_SIZE_HALF;
+    if new_position.y > WINDOW_SIZE_HALF {
+        new_position.y = -WINDOW_SIZE_HALF;
+    } else if new_position.y < -WINDOW_SIZE_HALF {
+        new_position.y = WINDOW_SIZE_HALF;
     }
+
+    return new_position;
 }
 
 fn snake_input(mut query_snake: Query<&mut Snake>, keyboard: Res<Input<KeyCode>>) {
@@ -116,13 +125,13 @@ fn snake_input(mut query_snake: Query<&mut Snake>, keyboard: Res<Input<KeyCode>>
     match snake_result {
         Ok(mut snake) => {
             if keyboard.pressed(KeyCode::Left) {
-                snake.dir = SnakeDiraction::LEFT;
+                snake.dir = SnakeDirection::LEFT;
             } else if keyboard.pressed(KeyCode::Right) {
-                snake.dir = SnakeDiraction::RIGHT;
+                snake.dir = SnakeDirection::RIGHT;
             } else if keyboard.pressed(KeyCode::Up) {
-                snake.dir = SnakeDiraction::UP;
+                snake.dir = SnakeDirection::UP;
             } else if keyboard.pressed(KeyCode::Down) {
-                snake.dir = SnakeDiraction::DOWN;
+                snake.dir = SnakeDirection::DOWN;
             }
         }
         Err(_) => todo!(),
@@ -161,8 +170,8 @@ fn collide_snake_body(
                 let entity = snake.body[index];
                 commands.entity(entity).despawn();
             }
-            
-            snake.body = Vec::from([snake.body[0]]);
+
+            snake.body = VecDeque::from([snake.body[0]]);
         }
     }
 }
@@ -190,15 +199,22 @@ fn collide_frog(
         );
 
         if let Some(_) = collided {
-            let snake_body_entity = snake_body_node(&mut commands);
-            snake.body.push(snake_body_entity);
+            let snake_body_entity = snake_body_node(
+                &mut commands,
+                Vec3 {
+                    x: WINDOW_SIZE,
+                    y: WINDOW_SIZE,
+                    z: 0.0,
+                },
+            );
+            snake.body.push_back(snake_body_entity);
             spawn_frog(&mut commands);
             commands.entity(frog).despawn();
         }
     }
 }
 
-fn snake_body_node(commands: &mut Commands) -> Entity {
+fn snake_body_node(commands: &mut Commands, translation: Vec3) -> Entity {
     commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
@@ -206,6 +222,7 @@ fn snake_body_node(commands: &mut Commands) -> Entity {
                 custom_size: Some(Vec2 { x: SIZE, y: SIZE }),
                 ..Default::default()
             },
+            transform: Transform::from_translation(translation),
 
             ..Default::default()
         })

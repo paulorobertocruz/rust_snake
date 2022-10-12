@@ -13,8 +13,8 @@ fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(WindowDescriptor {
-            width: WINDOWN_SIZE,
-            height: WINDOWN_SIZE,
+            width: WINDOW_SIZE,
+            height: WINDOW_SIZE,
             title: "Snake Game".to_string(),
             ..default()
         })
