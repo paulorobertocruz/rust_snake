@@ -42,7 +42,14 @@ struct Snake {
 struct SnakeBodyNode;
 
 fn spawn_snake_head(mut commands: Commands) {
-    let id_head = snake_body_node(&mut commands);
+    let id_head = snake_body_node(
+        &mut commands,
+        Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+    );
 
     commands.spawn().insert(Snake {
         body: VecDeque::from([id_head]),
@@ -192,15 +199,22 @@ fn collide_frog(
         );
 
         if let Some(_) = collided {
-            let snake_body_entity = snake_body_node(&mut commands);
-            snake.body.push(snake_body_entity);
+            let snake_body_entity = snake_body_node(
+                &mut commands,
+                Vec3 {
+                    x: WINDOW_SIZE,
+                    y: WINDOW_SIZE,
+                    z: 0.0,
+                },
+            );
+            snake.body.push_back(snake_body_entity);
             spawn_frog(&mut commands);
             commands.entity(frog).despawn();
         }
     }
 }
 
-fn snake_body_node(commands: &mut Commands) -> Entity {
+fn snake_body_node(commands: &mut Commands, translation: Vec3) -> Entity {
     commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
@@ -208,6 +222,7 @@ fn snake_body_node(commands: &mut Commands) -> Entity {
                 custom_size: Some(Vec2 { x: SIZE, y: SIZE }),
                 ..Default::default()
             },
+            transform: Transform::from_translation(translation),
 
             ..Default::default()
         })
